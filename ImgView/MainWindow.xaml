@@ -15,24 +15,26 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBox Grid.Row="0" Name="dirPathTextBox" Text="C:\test"/>
+            <TextBox Grid.Row="0" Name="dirPathTextBox" Text="C:\aaa" KeyDown="dirPathTextBox_KeyDown"/>
             <ComboBox Name="sizeCombobox" Grid.Row="1" Width="100" Margin="5" SelectedIndex="0" SelectionChanged="ComboBox_SelectionChanged">
                 <ComboBoxItem Content="300"/>
                 <ComboBoxItem Content="400"/>
                 <ComboBoxItem Content="500"/>
                 <ComboBoxItem Content="600"/>
             </ComboBox>
-            <ListView Grid.Row="2" Name="myListView" Margin="1" MaxWidth="100" FontFamily="Meiryo">
+            <ToggleButton Grid.Row="2" Content="MainMode" Name="delToggleButton" Click="DelToggleButton_Click"></ToggleButton>
+            <ListView Grid.Row="3" Name="delFileList" Margin="1" MaxWidth="100" FontFamily="Meiryo">
                 <ListView.View>
                     <GridView>
                         <GridViewColumn Header="DustBox" DisplayMemberBinding="{Binding}" />
                     </GridView>
                 </ListView.View>
             </ListView>
-            <Button Grid.Row="3" Click="Button_Click">Clean DustBox</Button>
+            <Button Grid.Row="4" Click="DustBoxButton_Click">Clean DustBox</Button>
         </Grid>
         <ScrollViewer Name="mainScrollViewer" Grid.Column="1" ScrollChanged="ScrollViewer_ScrollChanged">
             <WrapPanel Name="mainWrapPanel"  Orientation="Vertical">
