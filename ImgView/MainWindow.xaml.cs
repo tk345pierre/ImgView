@@ -49,6 +49,7 @@ namespace ImgView
         private bool isRightButtonDown = false;
         private Point initialMousePosition;
         private string selectedDir = "";
+        private Image lastSelectedImage = null;
 
         enum MainMode
         {
@@ -120,22 +121,12 @@ namespace ImgView
 
         private void ClearImages()
         {
-            foreach (var wrapPanelChildren in mainWrapPanel.Children)
-            {
-                var stackPanel = wrapPanelChildren as StackPanel;
-                foreach (var child in stackPanel.Children)
-                {
-                    if (child.GetType() == typeof(ItemsControl))
-                    {
-                        var itemsControl = child as ItemsControl;
-                        itemsControl.Items.Clear();
-                        break;
-                    }
-                }
-            }
+            var itemsControl = GetVisibleImagesControls();
+            if (itemsControl == null) return;
+            itemsControl.Items.Clear();
         }
 
-        private void CreateImages(TextBlock? dirTextBlock)
+        private bool CreateImages(TextBlock? dirTextBlock)
         {
             var dirPath = dirPathTextBox.Text + "\\" + dirTextBlock.Text;
 
@@ -176,6 +167,7 @@ namespace ImgView
                 ItemsControl itemsControl = parentStackPanel.Children.OfType<ItemsControl>().FirstOrDefault();
                 itemsControl.Items.Add(itemstackPanel);
             }
+            return myImageList.Count > 0;
         }
 
         private void DirNameTextBlock_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -193,7 +185,11 @@ namespace ImgView
                 selectedDir = dirTextBlock.Text;
             }
 
-            CreateImages(dirTextBlock);
+            bool isCreated = CreateImages(dirTextBlock);
+            if (isCreated)
+            {
+                mainScrollViewer.ScrollToVerticalOffset(dirTextBlock.TransformToAncestor(mainScrollViewer).Transform(new Point(0, 0)).Y);
+            }
         }
 
         private void Image_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -279,27 +275,15 @@ namespace ImgView
             ComboBox? comboBox = sender as ComboBox;
             ComboBoxItem selectedItem = comboBox.SelectedItem as ComboBoxItem;
             var w = Int32.Parse(selectedItem.Content.ToString());
-
-            if (mainWrapPanel == null) return;
-            foreach (var wrapPanelChildren in mainWrapPanel.Children)
+            var itemsControl = GetVisibleImagesControls();
+            if (itemsControl == null) return;
+            foreach (var spobj in itemsControl.Items)
             {
-                var stackPanel = wrapPanelChildren as StackPanel;
-                foreach (var child in stackPanel.Children)
-                {
-                    if (child.GetType() != typeof(ItemsControl))
-                    {
-                        continue;
-                    }
-                    var itemsControl = child as ItemsControl;
-                    foreach (var spobj in itemsControl.Items)
-                    {
-                        var sp = spobj as StackPanel;
-                        var border = sp.Children.OfType<Border>().FirstOrDefault();
-                        var image = border.Child as Image;
-                        image.Width = w;
-                        image.MaxHeight = w * 3;
-                    }
-                }
+                var sp = spobj as StackPanel;
+                var border = sp.Children.OfType<Border>().FirstOrDefault();
+                var image = border.Child as Image;
+                image.Width = w;
+                image.MaxHeight = w * 3;
             }
         }
 
@@ -312,16 +296,17 @@ namespace ImgView
         private void Image_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
             var clickedImage = sender as Image;
-            if (clickedImage != null)
+            if (clickedImage == null)
             {
-                if (isRightButtonDown)
+                return;
+            }
+            if (isRightButtonDown)
+            {
+                isRightButtonDown = false;
+                Point currentMousePosition = e.GetPosition(null);
+                if (currentMousePosition.Y > initialMousePosition.Y)
                 {
-                    isRightButtonDown = false;
-                    Point currentMousePosition = e.GetPosition(null);
-                    if (currentMousePosition.Y > initialMousePosition.Y)
-                    {
-                        setDelFileList(clickedImage);
-                    }
+                    setDelFileList(clickedImage);
                 }
             }
         }
@@ -379,6 +364,55 @@ namespace ImgView
 
         private void setDelFileList(Image clickedImage)
         {
+            if (Keyboard.Modifiers == ModifierKeys.Shift)
+            {
+                if (mainWrapPanel == null) return;
+
+                bool addMode = false;
+                bool reverseSelect = false;
+                var itemsControl = GetVisibleImagesControls();
+                if (itemsControl == null) return;
+                foreach (var spobj in itemsControl.Items)
+                {
+                    var sp = spobj as StackPanel;
+                    var border = sp.Children.OfType<Border>().FirstOrDefault();
+                    var image = border.Child as Image;
+
+                    if (addMode)
+                    {
+                        AddDelFileList(image);
+                    }
+
+                    if (lastSelectedImage == image)
+                    {
+                        addMode = !addMode;
+                        if (reverseSelect)
+                        {
+                            AddDelFileList(image);
+                        }
+                    }
+
+                    if (clickedImage == image)
+                    {
+                        if (!addMode)
+                        {
+                            reverseSelect = true;
+                            AddDelFileList(image);
+                        }
+                        addMode = !addMode;
+                    }
+                }
+            }
+            else
+            {
+                AddDelFileList(clickedImage);
+            }
+
+            lastSelectedImage = clickedImage;
+        }
+
+        private void AddDelFileList(Image clickedImage)
+        {
             var filePath = GetImageAbsolutePath(clickedImage);
             if (delFileList.Items.Contains(filePath))
             {
@@ -388,6 +422,39 @@ namespace ImgView
             }
             delFileList.Items.Add(filePath);
             (clickedImage.Parent as Border).Background = new SolidColorBrush(Colors.Red);
+        }
+
+        private ItemsControl GetVisibleImagesControls()
+        {
+            ItemsControl returnVal = null;
+            bool hit = false;
+            if (mainWrapPanel == null) { return returnVal; }
+            foreach (var wrapPanelChildren in mainWrapPanel.Children)
+            {
+                var stackPanel = wrapPanelChildren as StackPanel;
+                foreach (var child in stackPanel.Children)
+                {
+                    if (child.GetType() != typeof(ItemsControl))
+                    {
+                        continue;
+                    }
+                    var itemsControl = child as ItemsControl;
+                    foreach (var spobj in itemsControl.Items)
+                    {
+                        var sp = spobj as StackPanel;
+                        var border = sp.Children.OfType<Border>().FirstOrDefault();
+                        if (border != null)
+                        {
+                            returnVal = itemsControl;
+                            hit = true;
+                            break;
+                        }
+                    }
+                    if (hit) break;
+                }
+                if (hit) break;
+            }
+            return returnVal;
         }
 
         private string GetImageAbsolutePath(Image image)
@@ -455,34 +522,22 @@ namespace ImgView
 
         private void ScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
-            foreach (var wrapPanelChildren in mainWrapPanel.Children)
+            var itemsControl = GetVisibleImagesControls();
+            if (itemsControl == null) return;
+            foreach (var spobj in itemsControl.Items)
             {
-                var stackPanel = wrapPanelChildren as StackPanel;
-                foreach (var child in stackPanel.Children)
+                var border = (spobj as StackPanel).Children.OfType<Border>().FirstOrDefault();
+                var image = (spobj as StackPanel).Children.OfType<Border>().FirstOrDefault().Child as Image;
+                if (IsInViewPort(border))
                 {
-                    if (child.GetType() != typeof(ItemsControl))
+                    if (image.Source == null)
                     {
-                        continue;
+                        image.Source = (image.Tag as MyImage).LoadBitmap();
                     }
-                    var itemsControl = child as ItemsControl;
-                    foreach (var spobj in itemsControl.Items)
-                    {
-                        var sp = spobj as StackPanel;
-                        var border = sp.Children.OfType<Border>().FirstOrDefault();
-                        var image = border.Child as Image;
-
-                        if (IsInViewPort(border))
-                        {
-                            if (image.Source == null)
-                            {
-                                image.Source = (image.Tag as MyImage).LoadBitmap();
-                            }
-                        }
-                        else
-                        {
-                            (image.Tag as MyImage).Unload();
-                        }
-                    }
+                }
+                else
+                {
+                    (image.Tag as MyImage).Unload();
                 }
             }
         }
@@ -492,7 +547,6 @@ namespace ImgView
             GeneralTransform transform = element.TransformToAncestor(mainScrollViewer);
             Rect elementBounds = transform.TransformBounds(new Rect(new Point(0, 0), element.RenderSize));
             Rect viewportBounds = new Rect(new Point(0, 0), mainScrollViewer.RenderSize);
-
             return viewportBounds.IntersectsWith(elementBounds);
         }
 
