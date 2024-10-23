@@ -67,6 +67,7 @@ namespace ImgView
         public MainWindow()
         {
             InitializeComponent();
+            this.WindowState = WindowState.Maximized;
             Init();
         }
 
